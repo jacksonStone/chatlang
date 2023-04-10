@@ -36,8 +36,9 @@ function sendTextToChatGPT(prompt) {
     const apiUrl = 'https://api.openai.com/v1/chat/completions';
     const headers = {'Content-Type': 'application/json', 'Authorization': `Bearer ${apiKey}`};
     const requestBody = {
-      model: "davinci",
-      prompt: `Only respond in code blocks. Do not explain or clarify anything. Write all code in javascript. Prefer the standard library over npm packages.\n${prompt}`,
+      model: "gpt-3.5-turbo",
+      messages: [{"role": "system", "content": "Only respond in code blocks. Do not explain or clarify anything. Write all code in javascript. Prefer the standard library over npm packages."},
+      {"role": "user", "content": prompt}],
       temperature: 0
     };
     const options = {method: 'POST', headers};
@@ -48,7 +49,7 @@ function sendTextToChatGPT(prompt) {
         if (res.statusCode === 200) {
           const parsedData = JSON.parse(data);
           console.log(parsedData);
-          resolve(parsedData.choices[0].text.trim());
+          resolve(parsedData.choices[0].message.content.trim());
         } else {reject(`Error: ${res.statusCode}`);}
       });
     });
