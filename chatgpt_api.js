@@ -1,36 +1,76 @@
-/**
- * By Jackson Stone
- */
-
 const https = require('https');
 const fs = require('fs');
 const readline = require('readline');
-
+const modifyOrCreateError = `Invalid input. Please type "modify" or "create".`;
 const rl = readline.createInterface({
   input: process.stdin,
   output: process.stdout
 });
+console.log(process.argv)
+if(process.argv.length === 2) {
+ startingPrompt();
+} else if (process.argv.length === 3) {
+  modifyOrCreatePrompt(process.argv[2])
+} else if (process.argv.length === 4) {
+  console.log(process.argv[2])
+  if (process.argv[2] === 'modify') {
+    adjustmentPrompt(process.argv[3])
+  } else if (process.argv[2] === 'create') {
+    create(process.argv[3])
+  } else {
+    console.error(modifyOrCreateError);
+    process.exit(1);
+  }
+}
+function startingPrompt() {
+  rl.question('Would you like to modify or create a file? (Type "modify" or "create"): ', modifyOrCreatePrompt);
+}
+function modifyOrCreatePrompt(command) {
+  if (command === 'modify') {
+    modifyPrompt()
+  } else if (command === 'create') {
+    createPrompt()
+  } else {
+    console.error(modifyOrCreateError);
+    process.exit(1);
+  }
+}
 
-rl.question('adjustment: ', async (inputString) => {
-  const previousContents = fs.readFileSync("chatgpt_api.js", 'utf-8');
-  const backupFile = `${Date.now()}-backup.js`;
+function modifyPrompt() {
+  rl.question('File name: ', adjustmentPrompt);
+}
+function adjustmentPrompt(fileName) {
+  rl.question('adjustment: ', async (inputString) => {
+    return modify(fileName, inputString);
+  });
+}
+function createPrompt() {
+  rl.question('File name: ', create);
+}
 
+async function modify(fileName, inputString) {
+  const previousContents = fs.readFileSync(fileName, 'utf-8');
+  const backupFile = `${fileName}-backup-${Date.now()}.js`;
   try {
     fs.writeFileSync(backupFile, previousContents);
-    let response = await sendTextToChatGPT(`\nrewrite this file to ${inputString}\n\n${previousContents}`);
-    const lines = response.split('\n');
-    const filteredLines = lines.filter(line => !line.includes('\`\`\`'));
-    response = filteredLines.join('\n');
-    fs.writeFileSync("chatgpt_api.js", response);
+    const response = await sendTextToChatGPT(`\nrewrite this file to ${inputString}\n\n${previousContents}`);
+    fs.writeFileSync(fileName, response);
     console.log(`Done.`);
     process.exit();
   } catch (error) {
     console.error(`Error: ${error}`);
     process.exit(1);
   }
-});
+}
+async function create(fileName) {
+  const response = await sendTextToChatGPT(`\nreturn the code that would go in a file named: ${fileName}\n`);
+  fs.writeFileSync(fileName, response);
+  console.log(`Done.`);
+  process.exit();
+}
 
 function sendTextToChatGPT(prompt) {
+  console.log("sending_request...");
   return new Promise((resolve, reject) => {
     const apiKey = process.env.OPENAI_API_KEY;
     const apiUrl = 'https://api.openai.com/v1/chat/completions';
@@ -49,7 +89,10 @@ function sendTextToChatGPT(prompt) {
         if (res.statusCode === 200) {
           const parsedData = JSON.parse(data);
           console.log(parsedData);
-          resolve(parsedData.choices[0].message.content.trim());
+          const lines = parsedData.choices[0].message.content.trim().split('\n');
+          const filteredLines = lines.filter(line => !line.includes('\`\`\`'));
+          response = filteredLines.join('\n');
+          resolve(response);
         } else {reject(`Error: ${res.statusCode}`);}
       });
     });
